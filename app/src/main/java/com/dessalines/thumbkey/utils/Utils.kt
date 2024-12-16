@@ -339,7 +339,7 @@ fun performKeyAction(
             val text = action.text
             Log.d(TAG, "committing key text: $text")
             ime.ignoreNextCursorMove()
-            ime.currentInputConnection.commitText(
+            ime.commitText(
                 text,
                 1,
             )

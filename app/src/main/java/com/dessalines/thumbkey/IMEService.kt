@@ -34,15 +34,26 @@ class IMEService :
         
         // Initialize prediction manager
         val tsm = getSystemService(TEXT_SERVICES_MANAGER_SERVICE) as TextServicesManager
+        Log.d(TAG, "Spell checker enabled (onCreate): ${tsm.isSpellCheckerEnabled}")
         if (tsm.isSpellCheckerEnabled) {
             predictionManager = PredictionManager(this)
+            Log.d(TAG, "PredictionManager initialized in onCreate")
+        } else {
+            Log.e(TAG, "Spell checker is not enabled, predictions won't work")
         }
     }
 
     private fun setupView(): View {
         val settingsRepo = (application as ThumbkeyApplication).appSettingsRepository
 
-        val view = ComposeKeyboardView(this, settingsRepo, predictionManager)
+        val view = ComposeKeyboardView(
+            this, 
+            settingsRepo, 
+            if (::predictionManager.isInitialized) predictionManager else {
+                Log.d(TAG, "Creating new PredictionManager in setupView")
+                PredictionManager(this)
+            }
+        )
         window?.window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(this)
             decorView.setViewTreeViewModelStoreOwner(this)
@@ -61,12 +72,17 @@ class IMEService :
         restarting: Boolean,
     ) {
         super.onStartInput(attribute, restarting)
+        Log.d(TAG, "onStartInput called, restarting: $restarting")
         
         // Re-initialize prediction manager if needed
         if (!::predictionManager.isInitialized) {
             val tsm = getSystemService(TEXT_SERVICES_MANAGER_SERVICE) as TextServicesManager
+            Log.d(TAG, "Spell checker enabled (onStartInput): ${tsm.isSpellCheckerEnabled}")
             if (tsm.isSpellCheckerEnabled) {
                 predictionManager = PredictionManager(this)
+                Log.d(TAG, "PredictionManager initialized in onStartInput")
+            } else {
+                Log.e(TAG, "Spell checker is not enabled, predictions won't work")
             }
         }
         
@@ -78,24 +94,46 @@ class IMEService :
         text: String,
         newCursorPosition: Int,
     ) {
+        Log.d(TAG, "commitText called with text: $text")
         currentInputConnection?.commitText(text, newCursorPosition)
+
+        if (!::predictionManager.isInitialized) {
+            Log.e(TAG, "Cannot handle predictions - PredictionManager not initialized")
+            return
+        }
 
         // Handle word boundaries for prediction
         if (text == " " || text == "\n") {
+            Log.d(TAG, "Word boundary detected, calling onWordComplete")
             predictionManager.onWordComplete()
         } else {
+            Log.d(TAG, "Calling onTextInput with: $text")
             predictionManager.onTextInput(text)
         }
     }
 
     fun handleBackspace() {
+        Log.d(TAG, "handleBackspace called")
         currentInputConnection?.deleteSurroundingText(1, 0)
+        
+        if (!::predictionManager.isInitialized) {
+            Log.e(TAG, "Cannot handle predictions - PredictionManager not initialized")
+            return
+        }
+        
         predictionManager.onBackspace()
     }
 
     fun commitSuggestion(suggestion: String) {
+        Log.d(TAG, "commitSuggestion called with: $suggestion")
+        if (!::predictionManager.isInitialized) {
+            Log.e(TAG, "Cannot handle predictions - PredictionManager not initialized")
+            return
+        }
+
         // Get the current word
         val currentWord = getCurrentWord()
+        Log.d(TAG, "Current word before suggestion: $currentWord")
 
         // Delete the current word
         for (i in currentWord.indices) {
@@ -116,6 +154,7 @@ class IMEService :
         if (lastSpace != -1) {
             beforeCursor = beforeCursor.substring(lastSpace + 1)
         }
+        Log.d(TAG, "getCurrentWord returning: $beforeCursor")
         return beforeCursor
     }
 

@@ -63,7 +63,7 @@ fun PredictionBar(
             }
         } else {
             Text(
-                text = "Predictions will appear here",
+                text = "HAIL VECTRON",
                 color = Color.White,
                 fontSize = 16.sp,
                 modifier = Modifier.padding(4.dp)
