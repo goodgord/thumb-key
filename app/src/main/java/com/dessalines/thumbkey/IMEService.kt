@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
+import android.view.textservice.TextServicesManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -30,7 +31,12 @@ class IMEService :
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        predictionManager = PredictionManager(this)
+        
+        // Initialize prediction manager
+        val tsm = getSystemService(TEXT_SERVICES_MANAGER_SERVICE) as TextServicesManager
+        if (tsm.isSpellCheckerEnabled) {
+            predictionManager = PredictionManager(this)
+        }
     }
 
     private fun setupView(): View {
@@ -55,6 +61,15 @@ class IMEService :
         restarting: Boolean,
     ) {
         super.onStartInput(attribute, restarting)
+        
+        // Re-initialize prediction manager if needed
+        if (!::predictionManager.isInitialized) {
+            val tsm = getSystemService(TEXT_SERVICES_MANAGER_SERVICE) as TextServicesManager
+            if (tsm.isSpellCheckerEnabled) {
+                predictionManager = PredictionManager(this)
+            }
+        }
+        
         val view = this.setupView()
         this.setInputView(view)
     }
