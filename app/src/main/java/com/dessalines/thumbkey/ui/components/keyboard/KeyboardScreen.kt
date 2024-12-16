@@ -60,15 +60,16 @@ import com.dessalines.thumbkey.db.DEFAULT_SOUND_ON_TAP
 import com.dessalines.thumbkey.db.DEFAULT_SPACEBAR_MULTITAPS
 import com.dessalines.thumbkey.db.DEFAULT_VIBRATE_ON_TAP
 import com.dessalines.thumbkey.keyboards.BACKSPACE_KEY_ITEM
+import com.dessalines.thumbkey.keyboards.CircularDragAction
 import com.dessalines.thumbkey.keyboards.EMOJI_BACK_KEY_ITEM
 import com.dessalines.thumbkey.keyboards.KB_EN_THUMBKEY_MAIN
+import com.dessalines.thumbkey.keyboards.KeyboardLayout
+import com.dessalines.thumbkey.keyboards.KeyboardMode
+import com.dessalines.thumbkey.keyboards.KeyboardPosition
 import com.dessalines.thumbkey.keyboards.NUMERIC_KEY_ITEM
 import com.dessalines.thumbkey.keyboards.RETURN_KEY_ITEM
-import com.dessalines.thumbkey.utils.CircularDragAction
 import com.dessalines.thumbkey.utils.KeyAction
-import com.dessalines.thumbkey.utils.KeyboardLayout
-import com.dessalines.thumbkey.utils.KeyboardMode
-import com.dessalines.thumbkey.utils.KeyboardPosition
+import com.dessalines.thumbkey.utils.PredictionManager
 import com.dessalines.thumbkey.utils.TAG
 import com.dessalines.thumbkey.utils.getKeyboardMode
 import com.dessalines.thumbkey.utils.keyboardPositionToAlignment
@@ -78,6 +79,8 @@ import kotlin.time.TimeMark
 @Composable
 fun KeyboardScreen(
     settings: AppSettings?,
+    predictionManager: PredictionManager,
+    onSuggestionClick: (String) -> Unit,
     onSwitchLanguage: () -> Unit,
     onChangePosition: ((old: KeyboardPosition) -> KeyboardPosition) -> Unit,
 ) {
@@ -97,7 +100,6 @@ fun KeyboardScreen(
         mutableStateOf(false)
     }
 
-    // TODO get rid of this crap
     val lastAction = remember { mutableStateOf<Pair<KeyAction, TimeMark>?>(null) }
 
     val keyboardDefinition =
@@ -198,7 +200,7 @@ fun KeyboardScreen(
                 Box(
                     modifier =
                         Modifier
-                            .weight(1f) // Take up available space equally
+                            .weight(1f)
                             .padding(keyPadding.dp)
                             .clip(RoundedCornerShape(cornerRadius.dp))
                             .then(
@@ -363,6 +365,13 @@ fun KeyboardScreen(
                             },
                         ),
             ) {
+                // Add PredictionBar at the top
+                PredictionBar(
+                    predictionManager = predictionManager,
+                    onSuggestionClick = onSuggestionClick,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
                 keyboard.arr.forEachIndexed { i, row ->
                     Row {
                         row.forEachIndexed { j, key ->

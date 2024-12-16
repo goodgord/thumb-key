@@ -15,6 +15,7 @@ import com.dessalines.thumbkey.db.AppSettingsRepository
 import com.dessalines.thumbkey.ui.components.keyboard.KeyboardScreen
 import com.dessalines.thumbkey.ui.theme.ThumbkeyTheme
 import com.dessalines.thumbkey.utils.KeyboardPosition
+import com.dessalines.thumbkey.utils.PredictionManager
 import com.dessalines.thumbkey.utils.keyboardLayoutsSetFromDbIndexString
 import kotlinx.coroutines.launch
 
@@ -22,6 +23,7 @@ import kotlinx.coroutines.launch
 class ComposeKeyboardView(
     context: Context,
     private val settingsRepo: AppSettingsRepository,
+    private val predictionManager: PredictionManager,
 ) : AbstractComposeView(context) {
     @Composable
     override fun Content() {
@@ -35,12 +37,15 @@ class ComposeKeyboardView(
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 KeyboardScreen(
                     settings = settings,
+                    predictionManager = predictionManager,
+                    onSuggestionClick = { suggestion ->
+                        ctx.commitSuggestion(suggestion)
+                    },
                     onSwitchLanguage = {
                         ctx.lifecycleScope.launch {
                             // Cycle to the next keyboard
                             val state = settingsState.value
                             state?.let { s ->
-
                                 val layouts =
                                     keyboardLayoutsSetFromDbIndexString(s.keyboardLayouts).toList()
                                 val currentLayout = s.keyboardLayout

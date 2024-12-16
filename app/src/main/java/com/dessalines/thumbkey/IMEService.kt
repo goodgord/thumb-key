@@ -16,6 +16,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.dessalines.thumbkey.utils.PredictionManager
 import com.dessalines.thumbkey.utils.TAG
 
 class IMEService :
@@ -23,10 +24,19 @@ class IMEService :
     LifecycleOwner,
     ViewModelStoreOwner,
     SavedStateRegistryOwner {
+    lateinit var predictionManager: PredictionManager
+
+    override fun onCreate() {
+        super.onCreate()
+        savedStateRegistryController.performRestore(null)
+        handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        predictionManager = PredictionManager(this)
+    }
+
     private fun setupView(): View {
         val settingsRepo = (application as ThumbkeyApplication).appSettingsRepository
 
-        val view = ComposeKeyboardView(this, settingsRepo)
+        val view = ComposeKeyboardView(this, settingsRepo, predictionManager)
         window?.window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(this)
             decorView.setViewTreeViewModelStoreOwner(this)
@@ -40,10 +50,6 @@ class IMEService :
         return view
     }
 
-    /**
-     * This is called every time the keyboard is brought up.
-     * You can't use onCreate, because that can't pick up new numeric inputs
-     */
     override fun onStartInput(
         attribute: EditorInfo?,
         restarting: Boolean,
@@ -53,18 +59,57 @@ class IMEService :
         this.setInputView(view)
     }
 
+    fun commitText(
+        text: String,
+        newCursorPosition: Int,
+    ) {
+        currentInputConnection?.commitText(text, newCursorPosition)
+
+        // Handle word boundaries for prediction
+        if (text == " " || text == "\n") {
+            predictionManager.onWordComplete()
+        } else {
+            predictionManager.onTextInput(text)
+        }
+    }
+
+    fun handleBackspace() {
+        currentInputConnection?.deleteSurroundingText(1, 0)
+        predictionManager.onBackspace()
+    }
+
+    fun commitSuggestion(suggestion: String) {
+        // Get the current word
+        val currentWord = getCurrentWord()
+
+        // Delete the current word
+        for (i in currentWord.indices) {
+            currentInputConnection?.deleteSurroundingText(1, 0)
+        }
+
+        // Insert the suggestion
+        currentInputConnection?.commitText(suggestion, 1)
+        predictionManager.onWordComplete()
+    }
+
+    fun getCurrentWord(): String {
+        val ic = currentInputConnection ?: return ""
+        // Get text before cursor
+        var beforeCursor = ic.getTextBeforeCursor(50, 0)?.toString() ?: ""
+        // Find the last word boundary
+        val lastSpace = beforeCursor.lastIndexOf(' ')
+        if (lastSpace != -1) {
+            beforeCursor = beforeCursor.substring(lastSpace + 1)
+        }
+        return beforeCursor
+    }
+
     // Lifecycle Methods
     private var lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
     private fun handleLifecycleEvent(event: Lifecycle.Event) = lifecycleRegistry.handleLifecycleEvent(event)
 
     override val lifecycle = lifecycleRegistry
-
-    override fun onCreate() {
-        super.onCreate()
-        savedStateRegistryController.performRestore(null)
-        handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -105,8 +150,6 @@ class IMEService :
     override val viewModelStore = ViewModelStore()
 
     // SaveStateRegistry Methods
-
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
-    override val savedStateRegistry: SavedStateRegistry =
-        savedStateRegistryController.savedStateRegistry
+    override val savedStateRegistry: SavedStateRegistry = savedStateRegistryController.savedStateRegistry
 }
